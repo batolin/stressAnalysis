@@ -17,7 +17,7 @@ TIME_FRAMES        : list[int]   = [5, 15, 20, 28]
 RETURN_PERIODS     : list[int]   = [192, 96, 48, 24, 12, 6]
 
 # Global variables 
-PATH               : str                = "/home/user/Desktop/stockVaR/stocks/"
+PATH               : str                = ""
 CSV                : str                = ".csv"
 SUFFIX             : str                = ""
 TOTAL_COUNT        : int                = len (FILENAME)
