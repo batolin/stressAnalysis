@@ -5,11 +5,12 @@ import scipy.stats
 # Input parameters
 STRESS_DATA    : str         = "stress"
 FILENAME       : list[str]   = ["FTSE100","SSE","BP","RIO","HSBA","BARC", "LIN"]
-# WEIGHT         : list[float] = [-0.0, .23, .23, .23, .11, .10, .10]  # NO SWAP
+WEIGHT         : list[float] = [-0.0, .23, .23, .23, .11, .10, .10]  # NO SWAP
 WEIGHT         : list[float] = [-0.31, .16, .16, .16, .07, .07, .07] # SWAP COMMITTED
+#WEIGHT = [-.13, .19, .19, .19, .1,.1,.1]
 
 # Simulation parameters.
-IS_STRESS          : bool        = False
+IS_STRESS          : bool        = True
 NUMBER_PERIODS     : int         = 1
 TOTAL_SIMULATIONS  : int         = 1000
 TIME_SIMULATED     : int         = 30
@@ -17,7 +18,7 @@ TIME_FRAMES        : list[int]   = [5, 15, 20, 28]
 RETURN_PERIODS     : list[int]   = [192, 96, 48, 24, 12, 6]
 
 # Global variables 
-PATH               : str                = ""
+PATH               : str                = "/home/bernardo/Desktop/stockVaR/stocks/"
 CSV                : str                = ".csv"
 SUFFIX             : str                = ""
 TOTAL_COUNT        : int                = len (FILENAME)
@@ -135,7 +136,9 @@ for s in range (TOTAL_SIMULATIONS):
     variation : list [list[float]] = [[None for _ in range (TIME_SIMULATED)] 
         for _ in range(TOTAL_COUNT)]
     # Start at 100%. 
-    for i in range (TOTAL_COUNT):
+    #variation [0][0] = 0
+    variation [0][0] = 1
+    for i in range (1, TOTAL_COUNT):
         variation[i][0] = 1
 
     # Samples the accumulated variations for p time-periods.
@@ -152,9 +155,9 @@ for s in range (TOTAL_SIMULATIONS):
             # The first quantile gets replaced by the quantile from the stress data.
             quantile[0] = standard_normal.ppf (accumulation)
             # Adjust the extreme cases slightly to prevent numeric overflow.
-            if (accumulation == 1):
+            if (accumulation >= 1 or accumulation == numpy.inf):
                 quantile [0] =.999
-            elif (accumulation == 0):
+            elif (accumulation <= 0 or accumulation == numpy.nan):
                 quantile [0] = .001
 
         # Correlates & cumulates.
@@ -162,6 +165,7 @@ for s in range (TOTAL_SIMULATIONS):
         cumulant = standard_normal.cdf (correlated)
 
         # Calculates the variation for each iid, accumulated.
+        #variation[0][p] = distribution[0].ppf (cumulant[0])
         for i in range (TOTAL_COUNT):
             variation[i][p] = (1 + distribution[i].ppf (
                 cumulant[i]
@@ -169,13 +173,22 @@ for s in range (TOTAL_SIMULATIONS):
 
     # Calculates the adjustment value for display purposes.
     adjustment = 0
+    #swap = 0
+    #guiding_weight = WEIGHT[0]
+    #for i in range (1, TOTAL_COUNT):
     for i in range (TOTAL_COUNT):
         adjustment += variation [i][0] * WEIGHT [i]
     # Actually updates the total portfolio VaR as funciton of the return periods.
     for p in range (TIME_SIMULATED):
-        portfolio_value[s][p] = -adjustment
-        for i in range (TOTAL_COUNT):
-            portfolio_value[s][p] += variation [i][p] * WEIGHT [i] 
+        values = [variation [i][p] * WEIGHT [i] for i in range (TOTAL_COUNT)]
+        portfolio_value[s][p] = sum (values) - adjustment
+        #portfolio_value[s][p] = sum (values [1:]) - adjustment
+        # Finally, adjust the portfolio by the swap on the guiding index...
+        #swap += variation[0][p] * guiding_weight
+        #portfolio_value[s][p] += swap
+        # For the guiding index, we actually do the update differently... This is because
+        # the weight of the guiding index must be readjusted by iteration...
+        #guiding_weight = WEIGHT[0] / sum (WEIGHT[1:]) * sum (values [1:])
 
 # Gets the cdf for the portfolio value as a function of time, by transposing the original
 # array and sorting the simulation VaR(s) in order.
@@ -243,7 +256,7 @@ buffer = "".join (buffer)
 # Prints output.
 print (buffer)
 
-#Displays the covariance matrix.
+# # Displays the covariance matrix.
 # buffer = []
 # buffer.append (",".join (FILENAME))
 # buffer.append ("\n")
@@ -253,3 +266,5 @@ print (buffer)
 #         buffer.append (",")
 #     buffer.append ("\n")
 # print ("".join(buffer))
+# # # The determinant.
+# # print (numpy.linalg.det(covariance_matrix))
